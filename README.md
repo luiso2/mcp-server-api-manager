@@ -6,6 +6,7 @@ Transform any AI into a powerful API client with persistent configurations, mult
 
 ## ✨ Features
 
+- **🤖 ChatGPT Deep Research Compatible**: Implements required `search` and `fetch` tools
 - **🔐 Multiple Authentication Types**: Bearer Token, API Key, Basic Auth, None
 - **💾 Persistent API Configurations**: Save and reuse API settings across sessions
 - **📊 Request Analytics**: Track usage, response times, and success rates
@@ -42,6 +43,30 @@ The server will be available at:
 - **Health Check**: `http://localhost:3000/health`
 
 ## 🛠️ Available Tools
+
+### 🤖 ChatGPT Deep Research Tools
+
+### search
+Search through saved API configurations and their usage history for ChatGPT Deep Research.
+
+**Parameters:**
+- `query` (string, required): Search query to find relevant API configurations, endpoints, or usage data
+
+**Returns:**
+- JSON object with `results` array containing matching APIs and endpoints
+- Each result has `id`, `title`, and `url` for ChatGPT Deep Research compatibility
+
+### fetch
+Fetch detailed information about a specific API configuration or endpoint for ChatGPT Deep Research.
+
+**Parameters:**
+- `id` (string, required): Unique identifier for the API configuration or endpoint to fetch
+
+**Returns:**
+- JSON object with detailed information including `id`, `title`, `text`, `url`, and `metadata`
+- Comprehensive documentation about the API or endpoint usage
+
+### 🔧 API Management Tools
 
 ### save_api
 Save a new API configuration for future use.
@@ -409,6 +434,25 @@ make_request({
 4. **Monitor Resources**: Use `apis://stats` to track request patterns
 5. **Health Check**: Verify server status with `/health` endpoint
 
+## 🤖 ChatGPT Deep Research Integration
+
+This server is **fully compatible** with ChatGPT Deep Research! It implements the required `search` and `fetch` tools that ChatGPT needs for deep research capabilities.
+
+### Usage with ChatGPT Deep Research
+
+1. **Save your APIs**: Use the management tools to save API configurations
+2. **Let ChatGPT search**: ChatGPT can search through your saved APIs using the `search` tool
+3. **Detailed information**: ChatGPT can fetch comprehensive details about any API or endpoint using the `fetch` tool
+4. **Execute requests**: ChatGPT can make HTTP requests to your saved APIs using `make_request`
+
+### What ChatGPT Can Research
+
+- **API Configurations**: Find APIs by name, description, or base URL
+- **Authentication Methods**: Discover which APIs use Bearer tokens, API keys, etc.
+- **Endpoint History**: Search through previously used endpoints and methods
+- **Usage Statistics**: Get performance data and success rates
+- **API Documentation**: Access detailed information about any saved API
+
 ## 🌐 ChatGPT Connector Setup
 
 ### 1. Expose with HTTPS (for ChatGPT)
@@ -431,7 +475,7 @@ ngrok http 3000
 2. **Create Connector**:
    - Settings → Connectors → Create
    - **Connector name**: "API Manager"
-   - **Description**: "Universal API manager - save configurations and execute HTTP requests with authentication"
+   - **Description**: "Universal API manager with Deep Research - save configurations and execute HTTP requests with authentication"
    - **Connector URL**: `https://your-ngrok-url.ngrok.app/mcp`
    - Click "Create"
 
@@ -439,6 +483,7 @@ ngrok http 3000
    - Start a new chat
    - Click "+" → Enable your connector
    - Try: *"Save a JSONPlaceholder API configuration and then get the first 5 posts"*
+   - Or use with Deep Research: *"Research the available API configurations and find ones that use authentication"*
 
 ## 🤝 Contributing
 

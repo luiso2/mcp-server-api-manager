@@ -503,6 +503,279 @@ mcp.tool(
   }
 );
 
+// TOOL: search - ChatGPT Deep Research compatibility
+mcp.tool(
+  "search",
+  "Search through saved API configurations and their usage history for ChatGPT Deep Research",
+  {
+    query: z.string().describe("Search query to find relevant API configurations, endpoints, or usage data")
+  },
+  async ({ query }) => {
+    try {
+      const searchResults: Array<{id: string, title: string, url: string}> = [];
+      const queryLower = query.toLowerCase();
+
+      // Search through API configurations
+      for (const [name, config] of apiConfigs.entries()) {
+        let relevanceScore = 0;
+        let matchReasons: string[] = [];
+
+        // Check if query matches API name
+        if (name.toLowerCase().includes(queryLower)) {
+          relevanceScore += 10;
+          matchReasons.push("name");
+        }
+
+        // Check if query matches description
+        if (config.description?.toLowerCase().includes(queryLower)) {
+          relevanceScore += 8;
+          matchReasons.push("description");
+        }
+
+        // Check if query matches base URL
+        if (config.baseUrl.toLowerCase().includes(queryLower)) {
+          relevanceScore += 6;
+          matchReasons.push("baseUrl");
+        }
+
+        // Check if query matches auth type
+        if (config.auth?.type.toLowerCase().includes(queryLower)) {
+          relevanceScore += 4;
+          matchReasons.push("auth");
+        }
+
+        // Check request history for this API
+        const apiRequests = requestHistory.filter(r => r.apiName === name);
+        for (const request of apiRequests) {
+          if (request.endpoint.toLowerCase().includes(queryLower) ||
+              request.method.toLowerCase().includes(queryLower)) {
+            relevanceScore += 2;
+            matchReasons.push("endpoints");
+            break;
+          }
+        }
+
+        if (relevanceScore > 0) {
+          searchResults.push({
+            id: `api-${name}`,
+            title: `${name} API - ${config.description || 'API Configuration'} (${matchReasons.join(', ')})`,
+            url: `${config.baseUrl}/info`
+          });
+        }
+      }
+
+      // Search through request history for endpoints and methods
+      const uniqueEndpoints = new Set<string>();
+      for (const request of requestHistory) {
+        if (request.endpoint.toLowerCase().includes(queryLower) ||
+            request.method.toLowerCase().includes(queryLower)) {
+          const endpointKey = `${request.apiName}-${request.endpoint}`;
+          if (!uniqueEndpoints.has(endpointKey)) {
+            uniqueEndpoints.add(endpointKey);
+            const apiConfig = apiConfigs.get(request.apiName);
+            searchResults.push({
+              id: `endpoint-${request.apiName}-${request.endpoint.replace(/[^a-zA-Z0-9]/g, '_')}`,
+              title: `${request.method} ${request.endpoint} - ${request.apiName} API`,
+              url: `${apiConfig?.baseUrl || 'unknown'}${request.endpoint}`
+            });
+          }
+        }
+      }
+
+      // Sort by relevance (title length as simple heuristic)
+      searchResults.sort((a, b) => b.title.length - a.title.length);
+
+      // Limit to top 10 results
+      const limitedResults = searchResults.slice(0, 10);
+
+      addToLog(`Search performed for: "${query}", found ${limitedResults.length} results`);
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ results: limitedResults })
+        }]
+      };
+
+    } catch (error: any) {
+      addToLog(`Search error for "${query}": ${error.message}`);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ results: [] })
+        }],
+        isError: true
+      };
+    }
+  }
+);
+
+// TOOL: fetch - ChatGPT Deep Research compatibility
+mcp.tool(
+  "fetch",
+  "Fetch detailed information about a specific API configuration or endpoint for ChatGPT Deep Research",
+  {
+    id: z.string().describe("Unique identifier for the API configuration or endpoint to fetch")
+  },
+  async ({ id }) => {
+    try {
+      let document: any = null;
+
+      // Handle API configuration fetch
+      if (id.startsWith('api-')) {
+        const apiName = id.replace('api-', '');
+        const config = getApiConfig(apiName);
+
+        if (config) {
+          const stats = requestHistory.filter(r => r.apiName === apiName);
+          const successfulRequests = stats.filter(r => r.success).length;
+          const averageResponseTime = stats.length > 0
+            ? Math.round(stats.reduce((sum, r) => sum + r.responseTime, 0) / stats.length)
+            : 0;
+
+          document = {
+            id,
+            title: `${apiName} API Configuration`,
+            text: `API Name: ${apiName}
+Base URL: ${config.baseUrl}
+Description: ${config.description || 'No description provided'}
+Authentication Type: ${config.auth?.type || 'none'}
+Default Headers: ${config.headers ? JSON.stringify(config.headers, null, 2) : 'None'}
+Timeout: ${config.timeout || 30000}ms
+Created: ${config.createdAt}
+Last Used: ${config.lastUsed || 'Never'}
+
+Usage Statistics:
+- Total Requests: ${stats.length}
+- Successful Requests: ${successfulRequests}
+- Success Rate: ${stats.length > 0 ? Math.round((successfulRequests / stats.length) * 100) : 0}%
+- Average Response Time: ${averageResponseTime}ms
+
+Available Endpoints (from history):
+${stats.map(r => `- ${r.method} ${r.endpoint} (${r.status}, ${r.responseTime}ms)`).join('\n') || 'No endpoint history available'}
+
+Authentication Details:
+${config.auth?.type === 'bearer' ? '- Uses Bearer token authentication' : ''}
+${config.auth?.type === 'api-key' ? `- Uses API key in header: ${config.auth.credentials?.headerName || 'unknown'}` : ''}
+${config.auth?.type === 'basic' ? '- Uses Basic authentication with username/password' : ''}
+${config.auth?.type === 'none' ? '- No authentication required' : ''}
+
+This API can be used with the make_request tool to execute HTTP requests.`,
+            url: `${config.baseUrl}/info`,
+            metadata: {
+              source: "api_manager",
+              type: "api_configuration",
+              authType: config.auth?.type || 'none',
+              requestCount: stats.length,
+              successRate: stats.length > 0 ? Math.round((successfulRequests / stats.length) * 100) : 0
+            }
+          };
+        }
+      }
+
+      // Handle endpoint fetch
+      if (id.startsWith('endpoint-')) {
+        const parts = id.replace('endpoint-', '').split('-');
+        const apiName = parts[0];
+        if (!apiName) {
+          throw new Error(`Invalid endpoint ID format: ${id}`);
+        }
+        const endpointPart = parts.slice(1).join('-').replace(/_/g, '/');
+
+        const config = getApiConfig(apiName);
+        if (!config) {
+          throw new Error(`API "${apiName}" not found`);
+        }
+
+        const endpointHistory = requestHistory.filter(r =>
+          r.apiName === apiName && r.endpoint.replace(/[^a-zA-Z0-9]/g, '_') === endpointPart
+        );
+
+        if (endpointHistory.length > 0) {
+          const firstRequest = endpointHistory[0];
+          if (!firstRequest) {
+            throw new Error(`No endpoint history found for ${id}`);
+          }
+          const endpoint = firstRequest.endpoint;
+          const methods = [...new Set(endpointHistory.map(r => r.method))];
+          const successfulRequests = endpointHistory.filter(r => r.success).length;
+          const averageResponseTime = Math.round(
+            endpointHistory.reduce((sum, r) => sum + r.responseTime, 0) / endpointHistory.length
+          );
+
+          document = {
+            id,
+            title: `${endpoint} - ${apiName} API Endpoint`,
+            text: `Endpoint: ${endpoint}
+API: ${apiName}
+Base URL: ${config.baseUrl}
+Full URL: ${config.baseUrl}${endpoint}
+
+Supported Methods: ${methods.join(', ')}
+
+Usage Statistics:
+- Total Requests: ${endpointHistory.length}
+- Successful Requests: ${successfulRequests}
+- Success Rate: ${Math.round((successfulRequests / endpointHistory.length) * 100)}%
+- Average Response Time: ${averageResponseTime}ms
+
+Request History:
+${endpointHistory.slice(-5).map(r =>
+  `- ${r.timestamp}: ${r.method} ${r.endpoint} → ${r.status} (${r.responseTime}ms)`
+).join('\n')}
+
+Authentication: ${config.auth?.type || 'none'}
+
+To use this endpoint, call the make_request tool with:
+- apiName: "${apiName}"
+- endpoint: "${endpoint}"
+- method: one of [${methods.join(', ')}]`,
+            url: `${config.baseUrl}${endpoint}`,
+            metadata: {
+              source: "api_manager",
+              type: "endpoint_info",
+              apiName,
+              endpoint,
+              methods,
+              requestCount: endpointHistory.length,
+              successRate: Math.round((successfulRequests / endpointHistory.length) * 100)
+            }
+          };
+        }
+      }
+
+      if (!document) {
+        throw new Error(`Document with ID "${id}" not found`);
+      }
+
+      addToLog(`Fetched document: ${id}`);
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(document)
+        }]
+      };
+
+    } catch (error: any) {
+      addToLog(`Fetch error for ID "${id}": ${error.message}`);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            id,
+            title: "Document Not Found",
+            text: `Error: ${error.message}`,
+            url: "",
+            metadata: { source: "api_manager", error: true }
+          })
+        }],
+        isError: true
+      };
+    }
+  }
+);
+
 // RESOURCE: apis://list
 mcp.registerResource("apis-list", "apis://list", {
   description: "Complete list of all saved API configurations",
@@ -722,11 +995,23 @@ app.get("/", (req, res) => {
   res.json({
     name: "api-manager-mcp",
     version: "1.0.0",
-    description: "Universal API Manager for MCP - Save configurations and execute HTTP requests to any API",
+    description: "Universal API Manager for MCP - Save configurations and execute HTTP requests to any API with ChatGPT Deep Research compatibility",
     status: "running",
     mcp_endpoint: "/mcp",
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
+    chatgpt_compatible: true,
+    tools: {
+      // ChatGPT Deep Research tools
+      search: "Search through saved API configurations and usage history",
+      fetch: "Fetch detailed information about APIs and endpoints",
+      // API Management tools
+      save_api: "Save API configurations with authentication",
+      make_request: "Execute HTTP requests to saved APIs",
+      list_apis: "List all saved API configurations",
+      get_api: "Get specific API configuration details",
+      delete_api: "Delete API configurations"
+    },
     stats: {
       savedApis: apiConfigs.size,
       totalRequests: requestHistory.length
@@ -789,7 +1074,9 @@ async function startServer() {
 📍 HTTP: http://${HOST}:${PORT}
 🔗 MCP Endpoint: http://${HOST}:${PORT}/mcp
 ❤️  Health Check: http://${HOST}:${PORT}/health
-🛠️  Tools: save_api, make_request, list_apis, get_api, delete_api
+
+✅ ChatGPT Deep Research Compatible!
+🔍 Tools: search, fetch (ChatGPT), save_api, make_request, list_apis, get_api, delete_api
 📚 Resources: apis://list, apis://stats, apis://help
 
 For ChatGPT connector, use: https://your-domain.com/mcp
