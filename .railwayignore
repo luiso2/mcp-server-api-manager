@@ -1,0 +1,17 @@
+# Railway ignore file - exclude unnecessary files from deployment
+node_modules/.bin/
+*.log
+.env
+.env.local
+.git/
+.vscode/
+.idea/
+src/
+*.ts
+!dist/
+
+# Include only production files
+!package.json
+!package-lock.json
+!dist/
+!README.md

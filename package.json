@@ -1,0 +1,41 @@
+{
+  "name": "mcp-chatgpt-template",
+  "version": "1.0.0",
+  "description": "MCP server template compatible with ChatGPT connectors using Streamable HTTP transport",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "clean": "rm -rf dist",
+    "rebuild": "npm run clean && npm run build",
+    "test": "echo \"No tests specified\" && exit 0",
+    "railway:build": "npm run build",
+    "railway:start": "npm start"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "chatgpt",
+    "connector",
+    "typescript",
+    "express"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "express": "^4.18.2",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "tsx": "^4.16.5",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
