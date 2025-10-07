@@ -1077,7 +1077,31 @@ app.get("/sse", (req, res) => {
     });
   }
 
-  // Create a new transport for SSE
+  // Check if this is a validation request from ChatGPT
+  // ChatGPT sends Accept: text/event-stream but doesn't expect a full SSE connection during validation
+  const userAgent = (req.headers["user-agent"] || "") as string;
+  const isValidationRequest = userAgent.toLowerCase().includes("chatgpt") || 
+                             !req.headers["connection"] || 
+                             !req.headers["cache-control"];
+
+  if (isValidationRequest) {
+    // For validation requests, return a 200 OK with SSE headers to indicate readiness
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+    
+    // Send a simple validation event and close
+    res.write('event: validation\n');
+    res.write('data: {"status":"ready","protocol":"mcp","version":"2024-11-05"}\n\n');
+    res.end();
+    return;
+  }
+
+  // Create a new transport for actual SSE connections
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
     onsessioninitialized: (sessionId) => {
