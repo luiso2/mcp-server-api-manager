@@ -1,7 +1,7 @@
 {
-  "name": "mcp-chatgpt-template",
+  "name": "mcp-server-api-manager",
   "version": "1.0.0",
-  "description": "MCP server template compatible with ChatGPT connectors using Streamable HTTP transport",
+  "description": "Universal API Manager for MCP - Save configurations and execute HTTP requests to any API with full authentication support",
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
@@ -17,10 +17,16 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "api-manager",
+    "http-client",
+    "rest-api",
     "chatgpt",
     "connector",
     "typescript",
-    "express"
+    "express",
+    "authentication",
+    "bearer-token",
+    "api-key"
   ],
   "author": "Your Name",
   "license": "MIT",
