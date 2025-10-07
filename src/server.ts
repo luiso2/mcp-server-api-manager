@@ -133,19 +133,15 @@ function sanitizeConfig(config: ApiConfig): any {
   const sanitized = { ...config };
   if (sanitized.auth?.credentials) {
     const creds = sanitized.auth.credentials;
-    sanitized.auth.credentials = {
-      username: creds.username,
-      headerName: creds.headerName,
-      token: creds.token ? '[REDACTED]' : undefined,
-      apiKey: creds.apiKey ? '[REDACTED]' : undefined,
-      password: creds.password ? '[REDACTED]' : undefined
-    };
-    // Remove undefined values
-    Object.keys(sanitized.auth.credentials).forEach(key => {
-      if (sanitized.auth!.credentials![key as keyof typeof sanitized.auth.credentials] === undefined) {
-        delete sanitized.auth!.credentials![key as keyof typeof sanitized.auth.credentials];
-      }
-    });
+    const newCredentials: Record<string, string> = {};
+
+    if (creds.username) newCredentials.username = creds.username;
+    if (creds.headerName) newCredentials.headerName = creds.headerName;
+    if (creds.token) newCredentials.token = '[REDACTED]';
+    if (creds.apiKey) newCredentials.apiKey = '[REDACTED]';
+    if (creds.password) newCredentials.password = '[REDACTED]';
+
+    sanitized.auth.credentials = newCredentials;
   }
   return sanitized;
 }
@@ -241,8 +237,22 @@ mcp.tool(
       };
 
       if (description) config.description = description;
-      if (auth) config.auth = auth;
       if (headers) config.headers = headers;
+
+      // Handle auth configuration properly
+      if (auth) {
+        config.auth = {
+          type: auth.type
+        };
+        if (auth.credentials) {
+          config.auth.credentials = {};
+          if (auth.credentials.token) config.auth.credentials.token = auth.credentials.token;
+          if (auth.credentials.apiKey) config.auth.credentials.apiKey = auth.credentials.apiKey;
+          if (auth.credentials.username) config.auth.credentials.username = auth.credentials.username;
+          if (auth.credentials.password) config.auth.credentials.password = auth.credentials.password;
+          if (auth.credentials.headerName) config.auth.credentials.headerName = auth.credentials.headerName;
+        }
+      }
 
       apiConfigs.set(name, config);
       addToLog(`API configuration saved: ${name} (${baseUrl})`);
