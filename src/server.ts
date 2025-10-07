@@ -998,7 +998,7 @@ app.get("/", (req, res) => {
     description: "Universal API Manager for MCP - Save configurations and execute HTTP requests to any API with ChatGPT Deep Research compatibility",
     status: "running",
     mcp_endpoint: "/mcp",
-    sse_endpoint: "/sse/",
+    sse_endpoint: "/sse",
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     chatgpt_compatible: true,
@@ -1062,8 +1062,20 @@ app.use("/mcp", (req, res) => {
 });
 
 // SSE endpoint for ChatGPT Deep Research compatibility
-app.use("/sse", (req, res) => {
+app.get("/sse", (req, res) => {
   addToLog(`SSE endpoint accessed: ${req.method} ${req.url}`);
+
+  // If the client does not request Server-Sent Events, return a 200
+  // to satisfy connector health checks and explain requirements.
+  const acceptHeader = (req.headers["accept"] || "") as string;
+  if (!acceptHeader.toLowerCase().includes("text/event-stream")) {
+    return res.status(200).json({
+      ok: true,
+      message: "SSE endpoint ready. Client must set Accept: text/event-stream",
+      requirements: { method: "GET", accept: "text/event-stream" },
+      endpoints: { mcp: "/mcp", sse: "/sse" }
+    });
+  }
 
   // Create a new transport for SSE
   const transport = new StreamableHTTPServerTransport({
