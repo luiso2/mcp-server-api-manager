@@ -7,6 +7,7 @@ Transform any AI into a powerful API client with persistent configurations, mult
 ## ✨ Features
 
 - **🤖 ChatGPT Deep Research Compatible**: Implements required `search` and `fetch` tools
+- **🌊 SSE Compatible**: Server-Sent Events endpoint for real-time ChatGPT integration
 - **🔐 Multiple Authentication Types**: Bearer Token, API Key, Basic Auth, None
 - **💾 Persistent API Configurations**: Save and reuse API settings across sessions
 - **📊 Request Analytics**: Track usage, response times, and success rates
@@ -40,6 +41,7 @@ npm start
 The server will be available at:
 - **HTTP**: `http://localhost:3000`
 - **MCP Endpoint**: `http://localhost:3000/mcp`
+- **SSE Endpoint**: `http://localhost:3000/sse/` (for ChatGPT)
 - **Health Check**: `http://localhost:3000/health`
 
 ## 🛠️ Available Tools
@@ -476,7 +478,7 @@ ngrok http 3000
    - Settings → Connectors → Create
    - **Connector name**: "API Manager"
    - **Description**: "Universal API manager with Deep Research - save configurations and execute HTTP requests with authentication"
-   - **Connector URL**: `https://your-ngrok-url.ngrok.app/mcp`
+   - **Connector URL**: `https://your-ngrok-url.ngrok.app/sse/`
    - Click "Create"
 
 3. **Test Your Connector**:

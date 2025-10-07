@@ -998,9 +998,11 @@ app.get("/", (req, res) => {
     description: "Universal API Manager for MCP - Save configurations and execute HTTP requests to any API with ChatGPT Deep Research compatibility",
     status: "running",
     mcp_endpoint: "/mcp",
+    sse_endpoint: "/sse/",
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     chatgpt_compatible: true,
+    sse_compatible: true,
     tools: {
       // ChatGPT Deep Research tools
       search: "Search through saved API configurations and usage history",
@@ -1059,6 +1061,33 @@ app.use("/mcp", (req, res) => {
   });
 });
 
+// SSE endpoint for ChatGPT Deep Research compatibility
+app.use("/sse", (req, res) => {
+  addToLog(`SSE endpoint accessed: ${req.method} ${req.url}`);
+
+  // Create a new transport for SSE
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => randomUUID(),
+    onsessioninitialized: (sessionId) => {
+      addToLog(`SSE MCP session initialized: ${sessionId}`);
+      transports[sessionId] = transport;
+    },
+    onsessionclosed: (sessionId) => {
+      addToLog(`SSE MCP session closed: ${sessionId}`);
+      delete transports[sessionId];
+    }
+  });
+
+  // Connect the MCP server to this transport
+  mcp.connect(transport).then(() => {
+    // Handle the HTTP request through the transport for SSE
+    transport.handleRequest(req, res);
+  }).catch((error) => {
+    console.error("Error connecting MCP to SSE transport:", error);
+    res.status(500).json({ error: "Internal server error" });
+  });
+});
+
 // Start server
 async function startServer() {
   try {
@@ -1073,13 +1102,15 @@ async function startServer() {
 🚀 API Manager MCP Server is running!
 📍 HTTP: http://${HOST}:${PORT}
 🔗 MCP Endpoint: http://${HOST}:${PORT}/mcp
+📡 SSE Endpoint: http://${HOST}:${PORT}/sse/
 ❤️  Health Check: http://${HOST}:${PORT}/health
 
 ✅ ChatGPT Deep Research Compatible!
+🌊 SSE Compatible for real-time ChatGPT integration
 🔍 Tools: search, fetch (ChatGPT), save_api, make_request, list_apis, get_api, delete_api
 📚 Resources: apis://list, apis://stats, apis://help
 
-For ChatGPT connector, use: https://your-domain.com/mcp
+For ChatGPT connector, use: https://your-domain.com/sse/
 `);
     });
   } catch (error) {
