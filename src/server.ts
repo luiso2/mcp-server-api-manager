@@ -1091,7 +1091,7 @@ app.get("/sse", (req, res) => {
   });
 
   // Connect the MCP server to this transport
-  mcp.connect(transport).then(() => {
+  return mcp.connect(transport).then(() => {
     // Handle the HTTP request through the transport for SSE
     transport.handleRequest(req, res);
   }).catch((error) => {
