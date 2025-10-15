@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 
 // Environment configuration
 const PORT = process.env.PORT || 3000;
@@ -978,7 +979,14 @@ For issues or feature requests, check the server logs and ensure your API config
 const app = express();
 
 // Middleware
-app.use(express.json({ limit: "10mb" }));
+// IMPORTANT: Do NOT apply JSON body parsing to MCP transport routes, as it can
+// interfere with streaming/handshake. We conditionally bypass the parser.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/mcp') || req.path.startsWith('/sse')) return next();
+  return (express.json({ limit: "10mb" }) as any)(req, res, next);
+});
+
+// CORS headers for all routes (including MCP)
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
@@ -1036,7 +1044,15 @@ app.get("/health", (req, res) => {
 // Store transport instances
 const transports: Record<string, StreamableHTTPServerTransport> = {};
 
-// MCP endpoint handler
+// Explicit preflight for MCP
+app.options("/mcp", (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.sendStatus(200);
+});
+
+// MCP endpoint handler (Streamable HTTP)
 app.use("/mcp", (req, res) => {
   // Create a new transport for each request/session
   const transport = new StreamableHTTPServerTransport({
@@ -1061,7 +1077,15 @@ app.use("/mcp", (req, res) => {
   });
 });
 
-// SSE endpoint for ChatGPT Deep Research compatibility
+// Explicit preflight for SSE
+app.options("/sse", (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control');
+  res.sendStatus(200);
+});
+
+// SSE endpoint (dedicated SSE transport)
 app.get("/sse", (req, res) => {
   addToLog(`SSE endpoint accessed: ${req.method} ${req.url}`);
 
@@ -1102,7 +1126,7 @@ app.get("/sse", (req, res) => {
   }
 
   // Create a new transport for actual SSE connections
-  const transport = new StreamableHTTPServerTransport({
+  const transport = new SSEServerTransport({
     sessionIdGenerator: () => randomUUID(),
     onsessioninitialized: (sessionId) => {
       addToLog(`SSE MCP session initialized: ${sessionId}`);
