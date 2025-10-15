@@ -1142,6 +1142,7 @@ app.get("/sse", async (req, res) => {
 
     // Connect the MCP server to this transport
     await mcp.connect(transport);
+    return; // Add explicit return after successful connection
   } catch (error) {
     console.error("Error connecting MCP to SSE transport:", error);
     if (!res.headersSent) {
