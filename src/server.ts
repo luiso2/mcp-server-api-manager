@@ -1086,7 +1086,7 @@ app.options("/sse", (req, res) => {
 });
 
 // SSE endpoint (dedicated SSE transport)
-app.get("/sse", (req, res) => {
+app.get("/sse", async (req, res) => {
   addToLog(`SSE endpoint accessed: ${req.method} ${req.url}`);
 
   // If the client does not request Server-Sent Events, return a 200
@@ -1125,27 +1125,30 @@ app.get("/sse", (req, res) => {
     return;
   }
 
-  // Create a new transport for actual SSE connections
-  const transport = new SSEServerTransport({
-    sessionIdGenerator: () => randomUUID(),
-    onsessioninitialized: (sessionId) => {
-      addToLog(`SSE MCP session initialized: ${sessionId}`);
-      transports[sessionId] = transport;
-    },
-    onsessionclosed: (sessionId) => {
+  // For actual SSE connections, create a new transport
+  try {
+    const transport = new SSEServerTransport("/sse", res);
+    const sessionId = transport.sessionId; // Use transport's sessionId
+    
+    addToLog(`SSE MCP session initialized: ${sessionId}`);
+    transports[sessionId] = transport as any; // Type assertion for compatibility
+
+    // Handle session cleanup
+    res.on('close', () => {
       addToLog(`SSE MCP session closed: ${sessionId}`);
       delete transports[sessionId];
-    }
-  });
+      transport.close?.();
+    });
 
-  // Connect the MCP server to this transport
-  return mcp.connect(transport).then(() => {
-    // Handle the HTTP request through the transport for SSE
-    transport.handleRequest(req, res);
-  }).catch((error) => {
+    // Connect the MCP server to this transport
+    await mcp.connect(transport);
+  } catch (error) {
     console.error("Error connecting MCP to SSE transport:", error);
-    res.status(500).json({ error: "Internal server error" });
-  });
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+    return;
+  }
 });
 
 // Start server
